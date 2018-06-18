@@ -1,0 +1,9 @@
+# IDE's
+.idea
+.vscode
+
+# environment settings
+.env
+
+# dependencies
+vendor/
