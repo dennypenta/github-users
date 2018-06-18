@@ -14,13 +14,10 @@ import (
 	"net/http"
 )
 
-<<<<<<< HEAD
 const (
 	defaultTimeout = time.Millisecond*5000
 )
 
-=======
->>>>>>> 284b57459ce6bb4c1b17f9407385872888ceeea4
 var (
 	ErrTimeout      = errors.New("time is out")
 	FetchErrMessage = "Error while fetching the user #%d: %s"
@@ -48,6 +45,7 @@ func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
 	users := make([]*models.User, 0)
 	errs := make([]error, 0)
 	wg := &sync.WaitGroup{}
+	mx := &sync.Mutex{}
 	inProgres := make(chan int64, s.ConcurrencyLimit)
 	defer close(inProgres)
 
@@ -65,11 +63,15 @@ func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
 
 			u, _, err := s.source.GetByID(ctx, id)
 			if err != nil {
+				mx.Lock()
 				errs = append(errs, &UserFetchError{ID: id, message: err.Error()})
+				mx.Unlock()
 				return
 			}
 
+			mx.Lock()
 			users = append(users, s.Mapper(u))
+			mx.Unlock()
 		}(id)
 	}
 
