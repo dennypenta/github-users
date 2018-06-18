@@ -14,13 +14,10 @@ import (
 	"net/http"
 )
 
-<<<<<<< HEAD
 const (
 	defaultTimeout = time.Millisecond*5000
 )
 
-=======
->>>>>>> 284b57459ce6bb4c1b17f9407385872888ceeea4
 var (
 	ErrTimeout      = errors.New("time is out")
 	FetchErrMessage = "Error while fetching the user #%d: %s"
