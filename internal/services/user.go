@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github/internal/models"
-	"sync"
 	"time"
 
 	"github.com/google/go-github/github"
@@ -44,38 +43,42 @@ type UserService struct {
 func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
 	users := make([]*models.User, 0)
 	errs := make([]error, 0)
-	wg := &sync.WaitGroup{}
-	mx := &sync.Mutex{}
-	inProgres := make(chan int64, s.ConcurrencyLimit)
-	defer close(inProgres)
+	usersConsumer := make(chan *models.User, len(IDs))
+	errsConsumer := make(chan error, len(IDs))
+	sem := make(chan int64, s.ConcurrencyLimit)
+	defer close(sem)
+	defer close(usersConsumer)
+	defer close(errsConsumer)
 
 	for _, id := range IDs {
-		inProgres <- id
-		wg.Add(1)
+		sem <- id
 
 		go func(id int64) {
 			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 			defer cancel()
-			defer wg.Done()
 			defer func() {
-				<-inProgres
+				<-sem
 			}()
 
 			u, _, err := s.source.GetByID(ctx, id)
 			if err != nil {
-				mx.Lock()
-				errs = append(errs, &UserFetchError{ID: id, message: err.Error()})
-				mx.Unlock()
+				errsConsumer <- &UserFetchError{ID: id, message: err.Error()}
 				return
 			}
 
-			mx.Lock()
-			users = append(users, s.Mapper(u))
-			mx.Unlock()
+			usersConsumer <- s.Mapper(u)
 		}(id)
 	}
 
-	wg.Wait()
+	for i := 0; i < len(IDs); i++ {
+		select {
+		case u := <- usersConsumer:
+			users = append(users, u)
+		case e := <- errsConsumer:
+			errs = append(errs, e)
+		}
+	}
+
 	return users, errs
 }
 
