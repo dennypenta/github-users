@@ -5,7 +5,11 @@ import (
 	"github/internal/models"
 )
 
-func MapUser(user *github.User) *models.User {
+type UserMapper struct {
+
+}
+
+func (m *UserMapper) Map(user *github.User) *models.User {
 	return &models.User{
 		URL: *user.HTMLURL,
 		Meta: models.UserMeta{
@@ -14,4 +18,8 @@ func MapUser(user *github.User) *models.User {
 			AvatarURL: *user.AvatarURL,
 		},
 	}
+}
+
+func NewUserMapper() *UserMapper {
+	return &UserMapper{}
 }

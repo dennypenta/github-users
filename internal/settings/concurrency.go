@@ -14,6 +14,8 @@ var Concurrency = struct {
 } {}
 
 func init() {
+	// probably there is need to use godotenv lib and map in into struct,
+	// so we could init it clearly and declare default values right in that struct
 	limit, _ := strconv.Atoi(os.Getenv("MAX_PARALLEL_REQUESTS"))
 	if limit < 1 {
 		limit = defaultConcurrencyLimit

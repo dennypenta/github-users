@@ -2,8 +2,6 @@ package controllers
 
 import (
 	"github/internal/models"
-	"github/internal/services"
-	"github/internal/outputs"
 )
 
 type UserService interface {
@@ -27,9 +25,9 @@ func (c *UserController) ShowUsers(ids []int64) {
 	c.output.OutMany(users)
 }
 
-func NewUserController() *UserController {
+func NewUserController(serivce UserService, output UserOutput) *UserController {
 	return &UserController{
-		service: services.NewUserService(),
-		output: outputs.NewUserOutput(),
+		service: serivce,
+		output: output,
 	}
 }

@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
-		"github/internal/settings"
 	"github/internal/mappers"
-	"net/http"
 )
 
 const (
@@ -22,7 +20,18 @@ var (
 	FetchErrMessage = "Error while fetching the user #%d: %s"
 )
 
-type UserMapper func(*github.User) *models.User
+var (
+	_ UserMapper = new(mappers.UserMapper)
+	_ UserRepo = new(github.UsersService)
+)
+
+type UserMapper interface {
+	Map (*github.User) *models.User
+}
+
+type UserRepo interface {
+	GetByID(context.Context, int64) (*github.User, *github.Response, error)
+}
 
 type UserFetchError struct {
 	ID      int64
@@ -34,10 +43,10 @@ func (e *UserFetchError) Error() string {
 }
 
 type UserService struct {
-	ConcurrencyLimit int
-	Mapper           UserMapper
+	concurrencyLimit int
+	mapper           UserMapper
 
-	source *github.UsersService
+	repo UserRepo
 }
 
 func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
@@ -45,7 +54,7 @@ func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
 	errs := make([]error, 0)
 	usersConsumer := make(chan *models.User, len(IDs))
 	errsConsumer := make(chan error, len(IDs))
-	sem := make(chan int64, s.ConcurrencyLimit)
+	sem := make(chan int64, s.concurrencyLimit)
 	defer close(sem)
 	defer close(usersConsumer)
 	defer close(errsConsumer)
@@ -60,13 +69,13 @@ func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
 				<-sem
 			}()
 
-			u, _, err := s.source.GetByID(ctx, id)
+			u, _, err := s.repo.GetByID(ctx, id)
 			if err != nil {
 				errsConsumer <- &UserFetchError{ID: id, message: err.Error()}
 				return
 			}
 
-			usersConsumer <- s.Mapper(u)
+			usersConsumer <- s.mapper.Map(u)
 		}(id)
 	}
 
@@ -82,10 +91,10 @@ func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
 	return users, errs
 }
 
-func NewUserService() *UserService {
+func NewUserService(mapper UserMapper, repo UserRepo, concurrencyLimit int) *UserService {
 	return &UserService{
-		ConcurrencyLimit: settings.Concurrency.Limit,
-		Mapper: mappers.MapUser,
-		source: github.NewClient(http.DefaultClient).Users,
+		mapper:           mapper,
+		repo:             repo,
+		concurrencyLimit: concurrencyLimit,
 	}
 }
