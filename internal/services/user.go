@@ -4,29 +4,43 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github/internal/models"
+	"github.com/dennypenta/github-users/internal/models"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/github"
-	"github/internal/mappers"
 )
 
 const (
-	defaultTimeout = time.Millisecond*5000
+	defaultTimeout = time.Millisecond * 5000
 )
 
 var (
-	ErrTimeout      = errors.New("time is out")
+	ErrTimeout = errors.New("time is out")
+
 	FetchErrMessage = "Error while fetching the user #%d: %s"
 )
 
-var (
-	_ UserMapper = new(mappers.UserMapper)
-	_ UserRepo = new(github.UsersService)
-)
+type FetchErrorCollection struct {
+	errs []error
+}
+
+func(e *FetchErrorCollection) Error() string {
+	msgs := make([]string, 0, len(e.errs))
+
+	for _, err := range e.errs {
+		msgs = append(msgs, err.Error())
+	}
+
+	return strings.Join(msgs, ";")
+}
+
+func NewFetchErrorCollection(errs ...error) *FetchErrorCollection {
+	return &FetchErrorCollection{errs: errs}
+}
 
 type UserMapper interface {
-	Map (*github.User) *models.User
+	Map(*github.User) models.User
 }
 
 type UserRepo interface {
@@ -49,16 +63,17 @@ type UserService struct {
 	repo UserRepo
 }
 
-func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
-	users := make([]*models.User, 0)
+func (s *UserService) GetUsersByIDs(IDs []int64) ([]models.User, error) {
+	users := make([]models.User, 0)
 	errs := make([]error, 0)
-	usersConsumer := make(chan *models.User, len(IDs))
+	usersConsumer := make(chan models.User, len(IDs))
 	errsConsumer := make(chan error, len(IDs))
 	sem := make(chan int64, s.concurrencyLimit)
 	defer close(sem)
 	defer close(usersConsumer)
 	defer close(errsConsumer)
 
+	// ErrGroup is solving this task well too
 	for _, id := range IDs {
 		sem <- id
 
@@ -81,14 +96,14 @@ func (s *UserService) GetUsersByIDs(IDs []int64) ([]*models.User, []error) {
 
 	for i := 0; i < len(IDs); i++ {
 		select {
-		case u := <- usersConsumer:
+		case u := <-usersConsumer:
 			users = append(users, u)
-		case e := <- errsConsumer:
+		case e := <-errsConsumer:
 			errs = append(errs, e)
 		}
 	}
 
-	return users, errs
+	return users, NewFetchErrorCollection(errs...)
 }
 
 func NewUserService(mapper UserMapper, repo UserRepo, concurrencyLimit int) *UserService {

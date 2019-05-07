@@ -1,33 +1,29 @@
 package main
 
 import (
-	"fmt"
-	"github/internal/controllers"
-	"github/internal/input"
-
-	"github.com/joho/godotenv"
-	"github/internal/settings"
-	"github/internal/mappers"
-	"github.com/google/go-github/github"
+	"log"
 	"net/http"
-	"github/internal/services"
-	"github/internal/outputs"
+
+	"github.com/dennypenta/github-users/internal/config"
+	"github.com/dennypenta/github-users/internal/controllers"
+	"github.com/dennypenta/github-users/internal/input"
+	"github.com/dennypenta/github-users/internal/mappers"
+	"github.com/dennypenta/github-users/internal/presenters"
+	"github.com/dennypenta/github-users/internal/services"
+
+	"github.com/google/go-github/github"
 )
 
-func init() {
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("[WARNING]: Error loading .env file")
-	}
-}
-
-// example: go run cmd/gu/main.go 18236918 4324516  -123 12
 func main() {
-	concurrencyLimit := settings.Concurrency.Limit
+	conf, err := config.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	userMapper := mappers.NewUserMapper()
 	userRepo := github.NewClient(http.DefaultClient).Users
-	userService := services.NewUserService(userMapper, userRepo, concurrencyLimit)
-	userOutput := outputs.NewUserOutput()
+	userService := services.NewUserService(userMapper, userRepo, conf.ConcurrenyLimit)
+	userOutput := presenters.NewUserPresenter()
 
 	ids := input.ParseArgs()
 	controller := controllers.NewUserController(userService, userOutput)

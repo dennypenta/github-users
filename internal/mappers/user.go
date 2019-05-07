@@ -1,16 +1,15 @@
 package mappers
 
 import (
+	"github.com/dennypenta/github-users/internal/models"
 	"github.com/google/go-github/github"
-	"github/internal/models"
 )
 
 type UserMapper struct {
-
 }
 
-func (m *UserMapper) Map(user *github.User) *models.User {
-	return &models.User{
+func (m *UserMapper) Map(user *github.User) models.User {
+	return models.User{
 		URL: *user.HTMLURL,
 		Meta: models.UserMeta{
 			ID:        *user.ID,

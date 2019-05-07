@@ -1,9 +1,9 @@
 package input
 
 import (
+	"fmt"
 	"os"
 	"strconv"
-	"fmt"
 )
 
 func ParseArgs() []int64 {
